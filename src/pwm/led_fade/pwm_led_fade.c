@@ -15,6 +15,7 @@
 #include "pico/time.h"
 #include "hardware/irq.h"
 #include "hardware/pwm.h"
+#include "hardware/adc.h"
 
 #ifndef PICO_DEFAULT_LED_PIN
 #error pwm/led_fade example requires a board with a regular LED
@@ -68,12 +69,22 @@ int main(void) {
     // counter is allowed to wrap over its maximum range (0 to 2**16-1)
     pwm_config config = pwm_get_default_config();
     // Set divider, reduces counter clock to sysclock/this value
-    pwm_config_set_clkdiv(&config, 10.f);
+    pwm_config_set_clkdiv(&config, 0.1f);
     // Load the configuration into our PWM slice, and set it running.
     pwm_init(slice_num, &config, true);
 
+    stdio_init_all();
+    adc_init();
+    adc_set_temp_sensor_enabled(true);
+    adc_select_input(4);
+    const double conversion = 3.35 / (1 << 12);
+
     // This empty loop allows the PWM interrupt handler to effectively take over program control.
     // tight_loop_contents() is an empty no-op function that's a placeholder.
-    while (true)
+    while (true){
+        double adcResults = adc_read() * conversion;
+        double adcTemp = 27 - (adcResults - 0.706) / 0.001721;
+        pwm_config_set_clkdiv(&config, adcTemp*adcTemp);
         tight_loop_contents();
+    }
 }
